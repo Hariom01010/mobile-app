@@ -2,9 +2,11 @@ import React from 'react';
 import { screen, render, fireEvent } from '@testing-library/react-native';
 import AuthScreen from '../src/screens/AuthScreen/AuthScreen';
 import Strings from '../src/i18n/en';
-import { Toast } from 'react-native-toast-message/lib/src/Toast';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import { Linking } from 'react-native';
+import AuthApis from '../src/constants/apiConstant/AuthApi';
+import ProviderWrapper from '../src/utils/tests/ProviderWrapper';
 
 jest.mock('react-redux', () => {
   return {
@@ -13,22 +15,47 @@ jest.mock('react-redux', () => {
   };
 });
 
-it.skip('AuthScreen is rendered', () => {
-  render(<AuthScreen />);
+jest.mock('react-native/Libraries/Linking/Linking', () => ({
+  openURL: jest.fn(() => Promise.resolve('mockResolve')),
+  getInitialURL: jest.fn(() => Promise.resolve('mockResolve')),
+  addEventListener: jest.fn(),
+}));
+
+it('AuthScreen is rendered', () => {
+  render(
+    <ProviderWrapper>
+      <AuthScreen />
+    </ProviderWrapper>,
+  );
   screen.getByText(/welcome to/i);
   screen.getByText(/real dev squad/i);
 });
 
-it.skip('Clicking on Sign in with Github shows a toast', async () => {
+it('Clicking on Sign in with Github opens browser', async () => {
+  const mockBuildUrl = (url: string, params: { [key: string]: string }) => {
+    const queryString = Object.keys(params)
+      .map((key) => `${key}=${params[key]}`)
+      .join('&');
+
+    return `${url}?${queryString}`;
+  };
+  const queryParams = {
+    sourceUtm: 'rds-mobile-app',
+    redirectURL: 'https://realdevsquad.com/',
+  };
+  const baseUrl = AuthApis.GITHUB_AUTH_API;
+  const githubUrl = mockBuildUrl(baseUrl, queryParams);
+
   render(
-    <>
+    <ProviderWrapper>
       <AuthScreen />
-      <Toast />
-    </>,
+    </ProviderWrapper>,
   );
+
   const githubSignInBtn = screen.getByText(Strings.SIGN_IN_BUTTON_TEXT);
   fireEvent.press(githubSignInBtn);
-  screen.getByText(/Sign in with GitHub coming soon/i);
+  expect(Linking.openURL).toHaveBeenCalledTimes(1);
+  expect(Linking.openURL).toHaveBeenCalledWith(githubUrl);
 });
 
 describe('AuthScreen', () => {
